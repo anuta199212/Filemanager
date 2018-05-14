@@ -25,13 +25,13 @@ WINDOW *create_new_window(int x, int y, int w, int h, int color, int box_state);
 char** directory_read2(WINDOW *win, unsigned *items_counter, char** input_items, int c);
 char * items_array[] = {"Left panel", "Rigth_panel",  (char *)NULL };
 ITEM ** my_items;
-//unsigned size = 1;
 //---------------------------------------------------------------- 
 int main (void)
 {
 	WINDOW *window_rigth;
 	WINDOW *window_left;
 	WINDOW *current_window;
+	WINDOW *key_window;
 	MENU *my_menu;
 	WINDOW *menu_win;
 	int n_menuitems;
@@ -66,16 +66,15 @@ int main (void)
 	wbkgd(stdscr, COLOR_PAIR(WHITE));
 	refresh();
 
-
 	n_menuitems = (sizeof(items_array)/sizeof(items_array[0]));
 	my_items = (ITEM **) calloc(n_menuitems +1, sizeof(ITEM *));
 	for(int i = 0; i < n_menuitems; i++)
 		my_items[i] = new_item(items_array[i], " ");
 	my_menu = new_menu((ITEM **)my_items);
-	menu_win = create_new_window(0, 0, 30, n_menuitems, MENU_COLOR, box_off);
+	menu_win = create_new_window(0, 0, 12, n_menuitems, MENU_COLOR, box_off);
 	set_menu_back(my_menu, COLOR_PAIR(MENU_COLOR));
 	set_menu_win(my_menu, menu_win);
-	set_menu_sub(my_menu, derwin(menu_win, 6 ,30, 3,1));
+	set_menu_sub(my_menu, derwin(menu_win, 6 ,12, 3,1));
 	set_menu_mark(my_menu, "*");
 	wattron(menu_win, COLOR_PAIR(MENU_COLOR));
 	mvwprintw(menu_win, 0, 2, "Panel");
@@ -84,8 +83,9 @@ int main (void)
 	refresh();
 	wrefresh(menu_win);
 	
-	window_left = create_new_window(0, 1, COLS/2-1, LINES-4, WHITE, box_on);
-	window_rigth = create_new_window(COLS/2, 1, COLS/2-1, LINES-4, WHITE, box_on);
+	key_window = create_new_window(0, LINES-1, COLS, 1, MENU_COLOR, box_off);
+	window_left = create_new_window(0, 1, COLS/2-1, LINES-2, WHITE, box_on);
+	window_rigth = create_new_window(COLS/2, 1, COLS/2-1, LINES-2, WHITE, box_on);
 	scrollok(window_left, TRUE);
 	scrollok(window_rigth, TRUE);
 	current_window = window_left;
@@ -93,18 +93,10 @@ int main (void)
 	items_left = directory_read2(window_left, &items_counter_left, items_left, 0);
 	items_rigth = directory_read2(window_rigth, &items_counter_rigth, items_rigth, 0);
 
-/*
- 	wattron(window_left, A_STANDOUT);
-	mvwprintw(window_left, 1,2,"%s", *(items_left));
-	wattroff(window_left, A_STANDOUT);
-	wrefresh(window_left);
-	wattron(window_rigth, A_STANDOUT);
-	mvwprintw(window_rigth, COLS+1,2,"%s", *(items_rigth));
-	wattroff(window_rigth, A_STANDOUT);
-*/
+	mvwprintw(key_window, 0, 0, "F3 - open directory	F9 - Panel	F10 - Quit");
+	wrefresh(key_window);
 	wrefresh(window_left);
 	wrefresh(window_rigth);
-
 
 	while(1)
 	{
@@ -126,14 +118,12 @@ int main (void)
 				if (current_window == window_left)
 				{
 					position_left--;
-	//			wscrl(window_left, -1);
 					if (position_left < 0)
 						position_left = 0;
 				}
 				else if (current_window == window_rigth)
 				{
 					position_right--;
-	//			wscrl(window_left, -1);
 					if (position_right < 0)
 						position_right = 0;
 				}
@@ -142,16 +132,12 @@ int main (void)
 				if (current_window == window_left)
 				{
 					position_left++;
-	//				if (position >= LINES)
-	//					wscrl(window_left, 1);
 					if (position_left >= items_counter_left)
 						position_left = 0;
 				}
 				else if (current_window == window_rigth)
 				{
 					position_right++;
-	//				if (position >= LINES)
-	//					wscrl(window_left, 1);
 					if (position_right >= items_counter_rigth)
 						position_right = 0;
 				}
@@ -193,6 +179,9 @@ int main (void)
 				break;
 			case KEY_F(9):
 				post_menu(my_menu);
+				wclear(key_window);
+				mvwprintw(key_window, 0, 0, "F3 - Select item	F10 - Quit");
+				wrefresh(key_window);
 				while ((menu_key = wgetch(menu_win)) != KEY_F(10))
 				{
 					switch(menu_key)
@@ -219,6 +208,8 @@ int main (void)
 				box(window_rigth, 0, 0);
 				box(window_left, 0, 0);
 
+				mvwprintw(key_window, 0, 0, "F3 - open directory	F9 - Panel	F10 - Quit");
+				wrefresh(key_window);
 				refresh();
 				wrefresh(menu_win);
 				wrefresh(window_rigth);
@@ -240,9 +231,7 @@ int main (void)
 		wattroff(current_window, A_STANDOUT);
 		wrefresh(current_window);
 	}
-
 }
-
 //------------------------------------------------
 char** directory_read2(WINDOW *win, unsigned *items_counter, char** input_items, int c)
 {
@@ -270,21 +259,14 @@ char** directory_read2(WINDOW *win, unsigned *items_counter, char** input_items,
 	{
 		d = opendir(input_items[c]);
 	}
-
 	if (!d)
 	{
-		mvwprintw(win, count_dir, 1, "ERROR in open dir!");
-		wrefresh(win);
 		return(input_items);
 	}
-
 	ret = chdir(input_items[c]);
 	if (ret)
 	{
-		mvwprintw(win, count_dir, 1, "ERROR in chdir!");
-		wrefresh(win);
 		return(input_items);
-
 	}
 	
 	for(int i = 1; i<(*items_counter);i++)
@@ -292,17 +274,15 @@ char** directory_read2(WINDOW *win, unsigned *items_counter, char** input_items,
 	(*items_counter) = 0;
 	size = 1;
 	c = 0;
-	
 	wclear(win);	
 	box(win, 0, 0);
-	strncpy(input_items[0], tmp, 2);
+	strcpy(input_items[*items_counter], tmp);
 	wattron(win, A_STANDOUT);
-	mvwprintw(win, count_dir + 1,1, " %s",input_items[0]);
-	wattroff(win, A_STANDOUT);
-	
 	mvwprintw(win, count_dir + 1,1, " %s",input_items[(*items_counter)]);
+	wattroff(win, A_STANDOUT);
 	(*items_counter)++;
 	wrefresh(win);
+
 	while ((dir = readdir(d)) != NULL){
 		if ((!strcmp(dir->d_name, ".")) || (!strcmp(dir->d_name, "..")))
 			continue;
@@ -350,20 +330,15 @@ char** directory_read2(WINDOW *win, unsigned *items_counter, char** input_items,
 				attr = A_NORMAL;
 				break;
 		}
-
-
-
 		item_length = sizeof(dir->d_name);
 		if ((*items_counter) >= size)
 		{
 			size++;
 			input_items = (char**) realloc(input_items, size*sizeof(char*));
 		}
-	
 		input_items[(*items_counter)] = (char*) malloc(item_length+1);
 		strcpy(input_items[(*items_counter)], dir->d_name);
 		(*items_counter)++;
-
 		wattron(win, COLOR_PAIR(color) | attr);
 		mvwprintw(win, count_dir + 2,1, " %s", dir->d_name);
 		wattroff(win, COLOR_PAIR(color) | attr);
