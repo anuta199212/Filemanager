@@ -15,8 +15,11 @@ WINDOW *create_new_window(int startx, int starty, int width, int height, int col
 	wrefresh(local_win);
 	wbkgd(local_win, COLOR_PAIR(color));
 
-	wrefresh(local_win);
+	scrollok(local_win, TRUE);
+	idlok(local_win, TRUE);
+	wsetscrreg(local_win, starty, height);
 	keypad(local_win, TRUE);
+	wrefresh(local_win);
 	
 	return(local_win);
 }

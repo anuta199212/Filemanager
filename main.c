@@ -3,6 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <menu.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include "main.h"
 //---------------------------------------------------------------- 
 char* items_array[] = {"Left panel", "Rigth panel", (char *)NULL};
@@ -13,11 +16,14 @@ int main (void)
 	WINDOW *window_rigth;		//right panel
 	WINDOW *window_left;		//left panel
 	WINDOW *current_window;		
+	WINDOW *editor_window;		
 	WINDOW *key_window;		//window with a description of the keys
 	MENU *my_menu;			//menu for selecting current panel
-	WINDOW *menu_win;		//menu window
+	WINDOW *menu_win;		//menu windowi
+	FILE *stream;
 	int n_menuitems;		//number of menu items
 	int key = 0;			//pressed key
+	int editor_key = 0;			//pressed key
 	int position_left = 0;		//the current cursor position in the left panel
 	int position_right = 0;		//the current cursor position in the right panel
 	int menu_key = 0;		//pressed key in menu window
@@ -25,6 +31,13 @@ int main (void)
 	unsigned items_counter_left = 0;
 	char** items_rigth;		//array of directories in the right panel
 	unsigned items_counter_rigth = 0;
+	int type = 0;
+	char main_keys[] = "F3 - open directory\tF9 - Panel\tF10 - Quit";
+	char panel_keys[] = "F3 - Select item\tF10 - Quit";
+	char editor_keys[] = "F1 - Save file\tF10 - Quit";
+	size_t block_size = 0;
+	size_t block_count = 0;
+//	char* editor_buffer;
 
 	/*screen initialisation*/
 	screen_init();
@@ -50,15 +63,13 @@ int main (void)
 	key_window = create_new_window(0, LINES-1, COLS, 1, MENU_COLOR, BOX_OFF);
 	window_left = create_new_window(0, 1, COLS/2-1, LINES-2, WHITE, BOX_ON);
 	window_rigth = create_new_window(COLS/2, 1, COLS/2-1, LINES-2, WHITE, BOX_ON);
-	scrollok(window_left, TRUE);
-	scrollok(window_rigth, TRUE);
 	current_window = window_left;
 	
 	/*read the current directory and print the list */ 
 	items_left = directory_read(window_left, &items_counter_left, items_left, 0);
 	items_rigth = directory_read(window_rigth, &items_counter_rigth, items_rigth, 0);
 
-	mvwprintw(key_window, 0, 0, "F3 - open directory\t9 - Panel\tF10 - Quit");
+	mvwprintw(key_window, 0, 0, main_keys);
 	wrefresh(key_window);
 	wrefresh(window_left);
 	wrefresh(window_rigth);
@@ -76,6 +87,9 @@ int main (void)
 		{
 			mvwprintw(current_window, position_right+1,2,"%s", *(items_rigth+(position_right)));
 		}
+
+
+
 		wrefresh(current_window);
 		/*processing of the pressed key*/
 		switch(key)
@@ -108,10 +122,46 @@ int main (void)
 						position_right = 0;
 				}
 				break;
+
+			
 			case KEY_F(3):	//open directory
 				if (current_window == window_left)
 				{
-					items_left = directory_read(current_window, &items_counter_left, items_left, position_left);
+					type = type_select(items_left, position_left);
+					switch(type)
+					{
+						case 1:
+							items_left = directory_read(current_window, &items_counter_left, items_left, position_left);
+							break;
+						case 2:
+							wclear(key_window);
+							mvwprintw(key_window, 0, 0, editor_keys);
+							wrefresh(key_window);
+							editor_window = create_new_window(0, 0, COLS-1, LINES-1, WHITE, BOX_OFF);
+							curs_set(TRUE);
+							file_size_determine(editor_window, items_left, position_left, &block_size, &block_count);
+							char editor_buffer[block_size*block_count];
+							if (!(stream = file_editor_open(editor_window, editor_buffer, items_left, position_left, &block_size, &block_count)))
+								break;
+
+							file_processing(editor_window, editor_buffer, stream, &block_size, &block_count);
+
+							file_editor_close(stream);
+							clear();
+							wclear(editor_window);
+							delwin(editor_window);
+							box(window_rigth, 0, 0);
+							box(window_left, 0, 0);
+							wclear(key_window);
+							mvwprintw(key_window, 0, 0, main_keys);
+							refresh();
+							wrefresh(key_window);
+							wrefresh(window_left);
+							wrefresh(window_rigth);
+							wrefresh(menu_win);
+							curs_set(FALSE);
+							break;
+					}
 				position_left = 0;
 				}
 				else if (current_window == window_rigth)
@@ -119,6 +169,8 @@ int main (void)
 					items_rigth = directory_read(current_window, &items_counter_rigth, items_rigth, position_right);
 				position_right = 0;
 				}
+
+				mvwprintw(key_window, 0, 0, main_keys);
 				break;
 			case KEY_F(10):	//quit the program
 				unpost_menu(my_menu);
@@ -135,10 +187,12 @@ int main (void)
 				wclear(window_rigth);
 				delwin(window_left);
 				delwin(window_rigth);
+				delwin(editor_window);
 				clear();
 				wbkgd(stdscr, COLOR_PAIR(WHITE_BLACK));
 				refresh();
 				endwin();
+				printf(ESC "[H");
 				return(0);
 				break;
 			case KEY_F(9):	//display the menu
@@ -192,6 +246,7 @@ int main (void)
 		{
 			mvwprintw(current_window, position_right+1,2,"%s", *(items_rigth+(position_right)));
 		}
+
 		wrefresh(current_window);
 		wattroff(current_window, A_STANDOUT);
 		wrefresh(current_window);
